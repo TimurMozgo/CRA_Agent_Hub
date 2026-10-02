@@ -1,0 +1,887 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>CPA Agent Hub</title>
+    <script src="https://telegram.org/js/telegram-web-app.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+    <style>
+        :root {
+            --bg-color: var(--tg-theme-bg-color, #0b0f19);
+            --card-bg: var(--tg-theme-secondary-bg-color, #151b2b);
+            --text-color: var(--tg-theme-text-color, #f1f5f9);
+            --hint-color: var(--tg-theme-hint-color, #94a3b8);
+            --primary-color: var(--tg-theme-button-color, #8b5cf6);
+            --primary-glow: rgba(139, 92, 246, 0.3);
+            --primary-text: var(--tg-theme-button-text-color, #ffffff);
+            --border-color: #2d3748;
+            --success-color: #10b981;
+            --warning-color: #f59e0b;
+            --danger-color: #ef4444;
+            --info-color: #3b82f6;
+        }
+
+        * { box-sizing: border-box; margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, "Inter", "Segoe UI", Roboto, sans-serif; -webkit-tap-highlight-color: transparent; }
+        body { background-color: var(--bg-color); color: var(--text-color); padding: 16px; padding-bottom: 100px; }
+
+        .icon { width: 20px; height: 20px; fill: currentColor; flex-shrink: 0; }
+        .icon-lg { width: 24px; height: 24px; }
+        .icon-sm { width: 16px; height: 16px; }
+
+        .screen { display: none; flex-direction: column; gap: 16px; max-width: 500px; margin: 0 auto; animation: fadeIn 0.3s ease; }
+        .screen.active { display: flex; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+
+        .card { background: var(--card-bg); border-radius: 16px; padding: 16px; border: 1px solid var(--border-color); display: flex; flex-direction: column; gap: 12px; }
+        .card-header { display: flex; align-items: center; gap: 8px; margin-bottom: 4px; }
+        .card-title { font-size: 16px; font-weight: 700; color: var(--text-color); }
+        .offer-desc { font-size: 13px; color: var(--hint-color); line-height: 1.5; }
+
+        /*  Шапка профиля */
+        .profile-header-card {
+            background: linear-gradient(145deg, #0f172a, #1e1b4b);
+            border-radius: 16px;
+            padding: 20px;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            box-shadow: 0 4px 20px rgba(0,0,0,0.3);
+        }
+        .profile-header-card::before {
+            content: ''; position: absolute; top: 0; left: 0; right: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, #8b5cf6, transparent);
+        }
+        .profile-avatar-wrap { position: relative; display: inline-block; margin-bottom: 12px; z-index: 1; }
+        .profile-avatar {
+            width: 72px; height: 72px; border-radius: 50%; object-fit: cover;
+            border: 2px solid rgba(139, 92, 246, 0.4); box-shadow: 0 0 16px rgba(139, 92, 246, 0.3);
+        }
+        .profile-name { font-size: 20px; font-weight: 800; color: #f1f5f9; margin-bottom: 10px; position: relative; z-index: 1; }
+        .profile-info-row { display: flex; justify-content: center; align-items: center; gap: 8px; flex-wrap: wrap; position: relative; z-index: 1; }
+        .profile-id-badge {
+            font-size: 11px; color: #94a3b8; font-family: monospace; background: rgba(139, 92, 246, 0.1);
+            padding: 5px 10px; border-radius: 8px; border: 1px solid rgba(139, 92, 246, 0.2);
+        }
+        .profile-role-badge { display: inline-flex; align-items: center; gap: 4px; font-size: 11px; font-weight: 700; padding: 5px 10px; border-radius: 8px; }
+        .profile-role-badge.agent { background: rgba(245, 158, 11, 0.15); color: #fbbf24; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .profile-role-badge.manager { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.3); }
+        
+        .commission-badge { display: inline-flex; align-items: center; gap: 4px; background: rgba(16, 185, 129, 0.1); color: var(--success-color); padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 700; width: fit-content; border: 1px solid rgba(16, 185, 129, 0.2); }
+
+        .status-badge { display: inline-flex; align-items: center; gap: 6px; padding: 6px 10px; border-radius: 8px; font-size: 12px; font-weight: 700; width: fit-content; margin-top: 8px; }
+        .status-pending { background: rgba(245, 158, 11, 0.1); color: var(--warning-color); border: 1px solid rgba(245, 158, 11, 0.2); }
+        .status-accepted { background: rgba(59, 130, 246, 0.15); color: var(--info-color); border: 1px solid rgba(59, 130, 246, 0.3); }
+        .status-approved { background: rgba(16, 185, 129, 0.1); color: var(--success-color); border: 1px solid rgba(16, 185, 129, 0.2); }
+        .status-rejected { background: rgba(239, 68, 68, 0.1); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.2); }
+        .reject-reason { font-size: 12px; color: var(--danger-color); margin-top: 6px; padding: 8px; background: rgba(239, 68, 68, 0.05); border-radius: 6px; border-left: 2px solid var(--danger-color); }
+
+        .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 14px; font-weight: 700; cursor: pointer; background: var(--primary-color); color: var(--primary-text); text-align: center; transition: all 0.2s; display: flex; align-items: center; justify-content: center; gap: 8px; }
+        .btn:active { transform: scale(0.98); opacity: 0.9; }
+        .btn-secondary { background: transparent; border: 1px solid var(--border-color); color: var(--text-color); }
+        .btn-secondary:active { background: rgba(255,255,255,0.05); }
+        .btn-danger { background: rgba(239, 68, 68, 0.15); color: var(--danger-color); border: 1px solid rgba(239, 68, 68, 0.3); }
+        .btn-success { background: rgba(16, 185, 129, 0.15); color: var(--success-color); border: 1px solid rgba(16, 185, 129, 0.3); }
+        .btn-info { background: rgba(59, 130, 246, 0.15); color: var(--info-color); border: 1px solid rgba(59, 130, 246, 0.3); }
+        .btn-sm { padding: 8px 12px; font-size: 12px; width: auto; }
+
+        .form-group { display: flex; flex-direction: column; gap: 6px; }
+        .form-label { font-size: 12px; color: var(--hint-color); font-weight: 600; display: flex; align-items: center; gap: 6px; }
+        .form-input { width: 100%; padding: 12px; background: rgba(0,0,0,0.2); border: 1px solid var(--border-color); border-radius: 10px; color: var(--text-color); font-size: 14px; outline: none; transition: border-color 0.2s; }
+        .form-input:focus { border-color: var(--primary-color); box-shadow: 0 0 0 2px var(--primary-glow); }
+        textarea.form-input { resize: vertical; min-height: 80px; }
+
+        .nav { position: fixed; bottom: 0; left: 0; right: 0; background: rgba(21, 27, 43, 0.95); backdrop-filter: blur(10px); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 12px 0 24px 0; z-index: 100; }
+        .nav-item { background: none; border: none; color: var(--hint-color); font-size: 10px; font-weight: 600; display: flex; flex-direction: column; align-items: center; gap: 4px; cursor: pointer; width: 25%; transition: color 0.2s; }
+        .nav-item.active { color: var(--primary-color); }
+        .nav-item .icon { width: 24px; height: 24px; }
+        .hidden { display: none !important; }
+
+        .admin-stat-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; margin-bottom: 12px; }
+        .admin-stat-card { background: rgba(139, 92, 246, 0.08); border: 1px solid rgba(139, 92, 246, 0.2); border-radius: 12px; padding: 14px; text-align: center; }
+        .admin-stat-val { font-size: 24px; font-weight: 800; color: var(--primary-color); }
+        .admin-stat-lbl { font-size: 11px; color: var(--hint-color); margin-top: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+        
+        .pending-item, .edit-item { background: rgba(245, 158, 11, 0.05); border: 1px solid rgba(245, 158, 11, 0.2); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+        .edit-item { background: rgba(59, 130, 246, 0.05); border-color: rgba(59, 130, 246, 0.2); }
+        .pending-item-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+        .pending-author { font-size: 11px; color: var(--hint-color); font-family: monospace; background: rgba(255,255,255,0.05); padding: 2px 6px; border-radius: 4px; }
+        .pending-actions { display: flex; gap: 8px; margin-top: 12px; }
+        .pending-actions .btn { flex: 1; }
+        
+        .empty-state { text-align: center; padding: 30px 20px; color: var(--hint-color); font-size: 13px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+        .link-box { background: rgba(0,0,0,0.3); padding: 10px 12px; border-radius: 8px; font-family: monospace; font-size: 12px; word-break: break-all; color: #a5b4fc; border: 1px dashed var(--border-color); margin: 8px 0; }
+        .qr-wrap { display: flex; justify-content: center; background: #ffffff; padding: 12px; border-radius: 12px; width: fit-content; margin: 12px auto; }
+
+        .filter-tabs { display: flex; gap: 8px; margin-bottom: 12px; overflow-x: auto; padding-bottom: 4px; }
+        .filter-tab { flex: 1; padding: 10px 8px; border-radius: 10px; font-size: 12px; font-weight: 700; text-align: center; cursor: pointer; border: 1px solid var(--border-color); background: rgba(0,0,0,0.2); color: var(--hint-color); transition: all 0.2s; white-space: nowrap; display: flex; align-items: center; justify-content: center; gap: 4px; }
+        .filter-tab:active { transform: scale(0.96); }
+        .filter-tab.active-all { background: var(--primary-color); color: white; border-color: var(--primary-color); box-shadow: 0 4px 12px var(--primary-glow); }
+        .filter-tab.active-approved { background: rgba(16, 185, 129, 0.15); color: var(--success-color); border-color: var(--success-color); }
+        .filter-tab.active-rejected { background: rgba(239, 68, 68, 0.15); color: var(--danger-color); border-color: var(--danger-color); }
+
+        .profile-menu-grid { display: flex; flex-direction: column; gap: 12px; }
+        .menu-card { background: var(--card-bg); border: 1px solid var(--border-color); border-radius: 16px; padding: 18px; display: flex; align-items: center; gap: 14px; cursor: pointer; transition: all 0.2s; position: relative; overflow: hidden; }
+        .menu-card:active { transform: scale(0.98); }
+        .menu-card::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 4px; background: var(--accent-color, var(--primary-color)); }
+        .menu-card-icon { width: 48px; height: 48px; border-radius: 12px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; background: var(--accent-bg, rgba(139, 92, 246, 0.15)); color: var(--accent-color, var(--primary-color)); }
+        .menu-card-icon .icon { width: 24px; height: 24px; }
+        .menu-card-body { flex: 1; }
+        .menu-card-title { font-size: 15px; font-weight: 700; margin-bottom: 2px; }
+        .menu-card-desc { font-size: 12px; color: var(--hint-color); }
+        .menu-card-badge { background: var(--accent-color, var(--primary-color)); color: white; font-size: 11px; font-weight: 700; padding: 4px 8px; border-radius: 10px; min-width: 24px; text-align: center; }
+        
+        .back-button { display: flex; align-items: center; gap: 6px; background: none; border: none; color: var(--primary-color); font-size: 14px; font-weight: 600; cursor: pointer; padding: 8px 0; margin-bottom: 8px; width: 100%; text-align: left; }
+        .back-button:active { opacity: 0.7; }
+        .section-title { font-size: 18px; font-weight: 800; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+
+        @keyframes slideUpFade { from { opacity: 0; transform: translateY(25px); } to { opacity: 1; transform: translateY(0); } }
+        .animate-slide-up { animation: slideUpFade 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards; }
+
+        .offer-card { background: var(--card-bg); border-radius: 16px; overflow: hidden; border: 1px solid var(--border-color); margin-bottom: 12px; transition: transform 0.2s; }
+        .offer-card:active { transform: scale(0.98); }
+        .offer-image { width: 100%; height: 140px; object-fit: cover; background: #1e293b; display: block; }
+        .offer-image-placeholder { width: 100%; height: 140px; background: linear-gradient(135deg, rgba(139, 92, 246, 0.2), rgba(59, 130, 246, 0.2)); display: flex; align-items: center; justify-content: center; color: var(--hint-color); }
+        .offer-body { padding: 14px; }
+        .offer-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 8px; }
+        .offer-title { font-size: 16px; font-weight: 700; flex: 1; }
+        .offer-commission-badge { background: linear-gradient(135deg, #10b981, #059669); color: white; padding: 6px 10px; border-radius: 10px; font-size: 13px; font-weight: 800; white-space: nowrap; margin-left: 8px; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3); }
+        .offer-footer { display: flex; gap: 8px; margin-top: 12px; }
+
+        .file-upload-wrap { display: flex; flex-direction: column; gap: 8px; }
+        .file-upload-btn { display: flex; align-items: center; justify-content: center; gap: 8px; padding: 12px; background: rgba(59, 130, 246, 0.1); border: 2px dashed rgba(59, 130, 246, 0.4); border-radius: 12px; color: var(--info-color); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; }
+        .file-upload-btn:active { background: rgba(59, 130, 246, 0.2); transform: scale(0.98); }
+        .file-upload-btn input[type="file"] { display: none; }
+        .image-preview { width: 100%; height: 140px; border-radius: 12px; object-fit: cover; border: 1px solid var(--border-color); background: #1e293b; display: block; }
+        .image-preview-placeholder { width: 100%; height: 140px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px dashed var(--border-color); display: flex; align-items: center; justify-content: center; color: var(--hint-color); font-size: 12px; }
+
+        /* 🔥 НОВЫЕ СТИЛИ ДЛЯ ЦВЕТНЫХ КАРУСЕЛЕЙ */
+        .hero-carousel {
+            border-radius: 16px;
+            padding: 16px;
+            margin-bottom: 16px;
+            position: relative;
+            overflow: hidden;
+            box-shadow: 0 8px 24px rgba(0,0,0,0.4);
+        }
+        .carousel-header { display: flex; align-items: center; gap: 8px; margin-bottom: 12px; padding-bottom: 10px; border-bottom: 1px solid rgba(255,255,255,0.15); }
+        .carousel-title { font-size: 14px; font-weight: 700; color: #ffffff; display: flex; align-items: center; gap: 6px; }
+        .carousel-badge { background: rgba(255,255,255,0.2); backdrop-filter: blur(4px); color: white; font-size: 10px; font-weight: 700; padding: 3px 8px; border-radius: 6px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .carousel-container { position: relative; height: 90px; overflow: hidden; }
+        .carousel-track { display: flex; transition: transform 0.6s cubic-bezier(0.4, 0, 0.2, 1); height: 100%; }
+        .carousel-slide { min-width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 0 4px; }
+        .slide-title { font-size: 16px; font-weight: 800; color: #ffffff; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .slide-desc { font-size: 12px; color: rgba(255,255,255,0.85); line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .slide-badge { display: inline-flex; align-items: center; gap: 4px; background: rgba(255,255,255,0.15); backdrop-filter: blur(4px); color: white; padding: 4px 10px; border-radius: 8px; font-size: 12px; font-weight: 700; width: fit-content; margin-top: 6px; border: 1px solid rgba(255,255,255,0.2); }
+        .carousel-dots { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
+        .carousel-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.3); transition: all 0.3s; }
+        .carousel-dot.active { background: #ffffff; width: 18px; border-radius: 3px; }
+    </style>
+</head>
+<body>
+
+    <!-- Вкладка 1: Биржа -->
+    <div id="tab-market" class="screen active">
+        <!-- Карусель Биржи (Фиолетовая) -->
+        <div class="hero-carousel" id="carousel-market" style="background: linear-gradient(135deg, #4c1d95, #7c3aed);">
+            <div class="carousel-header">
+                <div class="carousel-title">
+                    <svg class="icon icon-sm" style="color: #fbbf24;" viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+                    Топ офферы недели
+                </div>
+                <div class="carousel-badge">Горячие</div>
+            </div>
+            <div class="carousel-container">
+                <div class="carousel-track" id="track-market"></div>
+            </div>
+            <div class="carousel-dots" id="dots-market"></div>
+        </div>
+        
+        <div class="card" style="background: linear-gradient(135deg, rgba(139, 92, 246, 0.15), rgba(139, 92, 246, 0.05)); border-color: rgba(139, 92, 246, 0.3);">
+            <div class="card-header">
+                <svg class="icon icon-lg" style="color: var(--primary-color);" viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+                <div class="card-title">Все доступные офферы</div>
+            </div>
+            <div class="offer-desc">Выбирай проверенных партнеров и добавляй их в портфель.</div>
+        </div>
+        <div id="market-offers-container"></div>
+    </div>
+
+    <!-- Вкладка 2: Портфель -->
+    <div id="tab-portfolio" class="screen">
+        <!-- Карусель Портфеля (Синяя, теперь с мотивацией) -->
+        <div class="hero-carousel" id="carousel-portfolio" style="background: linear-gradient(135deg, #1e3a8a, #2563eb);">
+            <div class="carousel-header">
+                <div class="carousel-title">
+                    <svg class="icon icon-sm" style="color: #60a5fa;" viewBox="0 0 24 24"><path d="M13 10V3L4 14h7v7l9-11h-7z"/></svg>
+                    Заряд мотивации
+                </div>
+                <div class="carousel-badge">Действуй</div>
+            </div>
+            <div class="carousel-container">
+                <div class="carousel-track" id="track-portfolio"></div>
+            </div>
+            <div class="carousel-dots" id="dots-portfolio"></div>
+        </div>
+
+        <div class="card-header" style="padding: 0 4px;">
+            <svg class="icon icon-lg" style="color: var(--primary-color);" viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .9-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>
+            <div class="card-title">Мои офферы</div>
+        </div>
+        <div id="portfolio-offers-container"></div>
+    </div>
+
+    <!-- Вкладка 3: Профиль -->
+    <div id="tab-profile" class="screen">
+        <div class="profile-header-card">
+            <div class="profile-avatar-wrap">
+                <img id="agent-avatar" src="https://ui-avatars.com/api/?name=User&background=8b5cf6&color=fff&size=128" class="profile-avatar">
+            </div>
+            <h2 id="profile-name" class="profile-name">Загрузка...</h2>
+            <div class="profile-info-row">
+                <span class="profile-id-badge" id="profile-id">ID: ---</span>
+                <span id="profile-role" class="profile-role-badge agent">
+                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>
+                    Агент
+                </span>
+            </div>
+        </div>
+
+        <!-- Карусель Профиля (Зеленая) -->
+        <div class="hero-carousel" id="carousel-profile" style="background: linear-gradient(135deg, #064e3b, #059669);">
+            <div class="carousel-header">
+                <div class="carousel-title">
+                    <svg class="icon icon-sm" style="color: #34d399;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+                    Советы для роста
+                </div>
+                <div class="carousel-badge">Прокачка</div>
+            </div>
+            <div class="carousel-container">
+                <div class="carousel-track" id="track-profile"></div>
+            </div>
+            <div class="carousel-dots" id="dots-profile"></div>
+        </div>
+
+        <div id="profile-content-container"></div>
+    </div>
+
+    <!-- Вкладка 4: Админ-панель -->
+    <div id="tab-admin" class="screen">
+        <div class="card">
+            <div class="card-header">
+                <svg class="icon icon-lg" style="color: var(--primary-color);" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>
+                <div class="card-title">Панель управления</div>
+            </div>
+            <div class="admin-stat-grid">
+                <div class="admin-stat-card"><div class="admin-stat-val" id="admin-total-partners">0</div><div class="admin-stat-lbl">Партнёров</div></div>
+                <div class="admin-stat-card"><div class="admin-stat-val" id="admin-total-agents">0</div><div class="admin-stat-lbl">Агентов</div></div>
+                <div class="admin-stat-card"><div class="admin-stat-val" id="admin-pending-count" style="color: var(--warning-color);">0</div><div class="admin-stat-lbl">На проверке</div></div>
+                <div class="admin-stat-card"><div class="admin-stat-val" id="admin-editing-count" style="color: var(--info-color);">0</div><div class="admin-stat-lbl">На редактировании</div></div>
+            </div>
+        </div>
+        
+        <div class="card-header" style="padding: 0 4px;">
+            <svg class="icon icon-lg" style="color: var(--warning-color);" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 15h-2v-6h2v6zm0-8h-2V7h2v2z"/></svg>
+            <div class="card-title">Заявки на проверку</div>
+        </div>
+        <div id="admin-pending-container"><div class="empty-state">Нет новых заявок</div></div>
+
+        <div class="card-header" style="padding: 0 4px; margin-top: 8px;">
+            <svg class="icon icon-lg" style="color: var(--info-color);" viewBox="0 0 24 24"><path d="M3 17.25V21h3.75L17.81 9.94l-3.75-3.75L3 17.25zM20.71 7.04c.39-.39.39-1.02 0-1.41l-2.34-2.34c-.39-.39-1.02-.39-1.41 0l-1.83 1.83 3.75 3.75 1.83-1.83z"/></svg>
+            <div class="card-title">Редактирование офферов</div>
+        </div>
+        <div id="admin-editing-container"><div class="empty-state">Нет офферов на редактировании</div></div>
+    </div>
+
+    <!-- Нижняя Навигация -->
+    <nav class="nav">
+        <button class="nav-item active" id="btn-tab-market" onclick="switchTab('market')">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>Биржа
+        </button>
+        <button class="nav-item" id="btn-tab-portfolio" onclick="switchTab('portfolio')">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M20 6h-4V4c0-1.11-.89-2-2-2h-4c-1.11 0-2 .9-2 2v2H4c-1.11 0-1.99.89-1.99 2L2 19c0 1.11.89 2 2 2h16c1.11 0 2-.89 2-2V8c0-1.11-.89-2-2-2zm-6 0h-4V4h4v2z"/></svg>Портфель
+        </button>
+        <button class="nav-item" id="btn-tab-profile" onclick="switchTab('profile')">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg>Профиль
+        </button>
+        <button class="nav-item hidden" id="btn-tab-admin" onclick="switchTab('admin')">
+            <svg class="icon" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4zm0 10.99h7c-.53 4.12-3.28 7.79-7 8.94V12H5V6.3l7-3.11v8.8z"/></svg>Админ
+        </button>
+    </nav>
+
+    <script>
+        function escapeHtml(text) {
+            if (!text) return '';
+            return String(text).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&#039;");
+        }
+
+        const tg = window.Telegram?.WebApp;
+        if (tg) { tg.ready(); tg.expand(); tg.setHeaderColor('#0b0f19'); tg.setBackgroundColor('#0b0f19'); }
+
+        const userId = tg?.initDataUnsafe?.user?.id || 6750749768;
+        const userName = tg?.initDataUnsafe?.user?.first_name || 'Агент';
+        const userPhoto = tg?.initDataUnsafe?.user?.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=8b5cf6&color=fff&size=128`;
+        
+        const ADMIN_IDS = [6088315974, 1246079025, 6750749768];
+        const isAdmin = true; 
+
+        document.getElementById('agent-name') && (document.getElementById('agent-name').innerText = userName + (isAdmin ? ' (Admin)' : ''));
+        document.getElementById('agent-id') && (document.getElementById('agent-id').innerText = `ID: ${userId}`);
+        document.getElementById('profile-name').innerText = userName;
+        document.getElementById('profile-id').innerText = `ID: ${userId}`;
+        document.getElementById('agent-avatar').src = userPhoto;
+        if (isAdmin) document.getElementById('btn-tab-admin').classList.remove('hidden');
+
+        const N8N_WEBHOOK_URL = 'https://tiktiok.xyz/webhook/cpa-gateway'; 
+
+        let catalog = JSON.parse(localStorage.getItem('cpa_catalog')) || [];
+        let myPortfolio = JSON.parse(localStorage.getItem(`cpa_portfolio_${userId}`)) || [];
+        let mySubmissions = JSON.parse(localStorage.getItem(`cpa_submissions_${userId}`)) || [];
+        let pendingRequests = JSON.parse(localStorage.getItem('cpa_pending')) || [];
+        let editingRequests = JSON.parse(localStorage.getItem('cpa_editing')) || [];
+        let savedCard = localStorage.getItem(`cpa_card_${userId}`) || '';
+        
+        let currentFilter = 'all'; 
+        let showAllSubmissions = false; 
+        let profileSection = 'menu';
+
+        document.getElementById('input-card') && (document.getElementById('input-card').value = savedCard);
+
+        // 🔥 УНИВЕРСАЛЬНАЯ ФУНКЦИЯ КАРУСЕЛИ
+        function initHeroCarousel(trackId, dotsId, items) {
+            // Очищаем предыдущий интервал, если он был
+            const intervalKey = `carouselInterval_${trackId}`;
+            if (window[intervalKey]) clearInterval(window[intervalKey]);
+
+            const track = document.getElementById(trackId);
+            const dotsContainer = document.getElementById(dotsId);
+            if (!track || !dotsContainer) return;
+
+            // Дублируем элементы, если их меньше 3, чтобы карусель выглядела полноценной
+            while (items.length < 3) {
+                items.push(items[0] || { title: 'Скоро здесь', desc: 'Новые возможности', badge: 'Ожидай' });
+            }
+
+            track.innerHTML = items.map(item => `
+                <div class="carousel-slide">
+                    <div class="slide-title">${escapeHtml(item.title)}</div>
+                    <div class="slide-desc">${escapeHtml(item.desc)}</div>
+                    <div class="slide-badge">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M11.8 10.9c-2.27-.59-3-1.2-3-2.15 0-1.09 1.01-1.85 2.7-1.85 1.78 0 2.44.85 2.5 2.1h2.21c-.07-1.72-1.12-3.3-3.21-3.81V3h-3v2.16c-1.94.42-3.5 1.68-3.5 3.61 0 2.31 1.91 3.46 4.7 4.13 2.5.6 3 1.48 3 2.41 0 .69-.49 1.79-2.7 1.79-2.06 0-2.87-.92-2.98-2.1h-2.2c.12 2.19 1.76 3.42 3.68 3.83V21h3v-2.15c1.95-.37 3.5-1.5 3.5-3.55 0-2.84-2.43-3.81-4.7-4.4z"/></svg>
+                        ${item.badge}
+                    </div>
+                </div>
+            `).join('');
+
+            dotsContainer.innerHTML = items.map((_, i) => `<div class="carousel-dot ${i === 0 ? 'active' : ''}"></div>`).join('');
+
+            let currentSlide = 0;
+            const updateSlide = () => {
+                currentSlide = (currentSlide + 1) % items.length;
+                track.style.transform = `translateX(-${currentSlide * 100}%)`;
+                dotsContainer.querySelectorAll('.carousel-dot').forEach((dot, i) => {
+                    dot.classList.toggle('active', i === currentSlide);
+                });
+            };
+
+            window[intervalKey] = setInterval(updateSlide, 7000); // Авто-скролл каждые 4 сек
+        }
+
+        function switchTab(tab) {
+            document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+            document.getElementById(`tab-${tab}`).classList.add('active');
+            document.getElementById(`btn-tab-${tab}`).classList.add('active');
+
+            if (tab === 'market') {
+                renderMarket();
+            } else if (tab === 'portfolio') {
+                renderPortfolio();
+            } else if (tab === 'profile') { 
+                profileSection = 'menu'; 
+                renderProfile(); 
+            } else if (tab === 'admin' && isAdmin) { 
+                loadPendingRequestsFromN8n(); 
+            }
+            window.scrollTo(0, 0);
+        }
+
+        function navigateProfileSection(section) {
+            profileSection = section;
+            tg?.HapticFeedback?.notificationOccurred('light');
+            renderProfile();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function renderProfile() {
+            mySubmissions = JSON.parse(localStorage.getItem(`cpa_submissions_${userId}`)) || [];
+            const hasApprovedPartner = mySubmissions.some(sub => sub.status === 'approved');
+            const roleBadge = document.getElementById('profile-role');
+            if (hasApprovedPartner) {
+                roleBadge.innerHTML = `<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg> Менеджер`;
+                roleBadge.className = 'profile-role-badge manager';
+            } else {
+                roleBadge.innerHTML = `<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/></svg> Агент`;
+                roleBadge.className = 'profile-role-badge agent';
+            }
+
+            const container = document.getElementById('profile-content-container');
+            container.innerHTML = '';
+            
+            // Инициализация карусели профиля при каждом рендере
+            const profileTips = [
+                { title: 'Добавляй партнеров', desc: 'Каждый одобренный партнер повышает твой статус и доход.', badge: 'Цель: Менеджер' },
+                { title: 'Проверяй портфель', desc: 'Используй уникальные ссылки и QR-коды для привлечения трафика.', badge: 'Совет дня' },
+                { title: 'Своевременный вывод', desc: 'Указывай актуальные реквизиты для быстрых выплат.', badge: 'Финансы' }
+            ];
+            initHeroCarousel('track-profile', 'dots-profile', profileTips);
+
+            if (profileSection === 'menu') renderProfileMenu(container);
+            else if (profileSection === 'add_partner') renderAddPartnerSection(container);
+            else if (profileSection === 'submissions') renderSubmissionsSection(container);
+            else if (profileSection === 'payout') renderPayoutSection(container);
+        }
+
+        function renderProfileMenu(container) {
+            const pendingCount = mySubmissions.filter(s => s.status === 'pending' || s.status === 'accepted').length;
+            container.innerHTML = `
+                <div class="animate-slide-up">
+                    <div class="profile-menu-grid">
+                        <div class="menu-card" onclick="navigateProfileSection('add_partner')" style="--accent-color: #8b5cf6; --accent-bg: rgba(139, 92, 246, 0.15);">
+                            <div class="menu-card-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg></div>
+                            <div class="menu-card-body"><div class="menu-card-title">Предложить партнёра</div><div class="menu-card-desc">Добавить новый бизнес в систему</div></div>
+                        </div>
+                        <div class="menu-card" onclick="navigateProfileSection('submissions')" style="--accent-color: #3b82f6; --accent-bg: rgba(59, 130, 246, 0.15);">
+                            <div class="menu-card-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg></div>
+                            <div class="menu-card-body"><div class="menu-card-title">Мои заявки</div><div class="menu-card-desc">Статусы и история модерации</div></div>
+                            ${pendingCount > 0 ? `<div class="menu-card-badge">${pendingCount}</div>` : ''}
+                        </div>
+                        <div class="menu-card" onclick="navigateProfileSection('payout')" style="--accent-color: #10b981; --accent-bg: rgba(16, 185, 129, 0.15);">
+                            <div class="menu-card-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg></div>
+                            <div class="menu-card-body"><div class="menu-card-title">Вывод средств</div><div class="menu-card-desc">Реквизиты и запрос выплаты</div></div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderAddPartnerSection(container) {
+            container.innerHTML = `
+                <div class="animate-slide-up">
+                    <button class="back-button" onclick="navigateProfileSection('menu')"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Назад к меню</button>
+                    <div class="section-title"><svg class="icon" style="color: #8b5cf6;" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg>Предложить партнёра</div>
+                    <div class="card">
+                        <div class="form-group"><label class="form-label">Название бизнеса / оффера</label><input type="text" id="partner-title" class="form-input" placeholder="Например: Прокат квадроциклов"></div>
+                        <div class="form-group"><label class="form-label">Описание и размер комиссии (%)</label><textarea id="partner-desc" class="form-input" placeholder="Краткое описание услуг..."></textarea></div>
+                        <div class="form-group"><label class="form-label">Прямая ссылка (если есть)</label><input type="text" id="partner-link" class="form-input" placeholder="https://..."></div>
+                        <div class="form-group"><label class="form-label">Контактное лицо (Имя)</label><input type="text" id="partner-contact-name" class="form-input" placeholder="Александр"></div>
+                        <div class="form-group"><label class="form-label">Номер телефона</label><input type="tel" id="partner-phone" class="form-input" placeholder="+380 XX XXX XX XX"></div>
+                        <button class="btn" onclick="submitNewPartner()"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg> Отправить на модерацию</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function renderSubmissionsSection(container) {
+            const approvedCount = mySubmissions.filter(s => s.status === 'approved').length;
+            const rejectedCount = mySubmissions.filter(s => s.status === 'rejected').length;
+
+            let html = `<button class="back-button" onclick="navigateProfileSection('menu')"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Назад к меню</button>
+            <div class="section-title"><svg class="icon" style="color: #3b82f6;" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>Мои заявки</div>`;
+
+            if (mySubmissions.length === 0) {
+                container.innerHTML = `<div class="animate-slide-up">${html}<div class="empty-state"><svg class="icon icon-lg" viewBox="0 0 24 24"><path d="M19 3H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm-5 14H7v-2h7v2zm3-4H7v-2h10v2zm0-4H7V7h10v2z"/></svg>Вы пока не добавляли партнёров</div></div>`;
+                return;
+            }
+
+            if (showAllSubmissions) {
+                html += `<div class="filter-tabs">
+                    <div class="filter-tab ${currentFilter === 'all' ? 'active-all' : ''}" onclick="setFilter('all')">Все (${mySubmissions.length})</div>
+                    <div class="filter-tab ${currentFilter === 'approved' ? 'active-approved' : ''}" onclick="setFilter('approved')"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg>Одобрено (${approvedCount})</div>
+                    <div class="filter-tab ${currentFilter === 'rejected' ? 'active-rejected' : ''}" onclick="setFilter('rejected')"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg>Отклонено (${rejectedCount})</div>
+                </div>`;
+            }
+
+            let filteredSubs = [...mySubmissions].reverse();
+            if (!showAllSubmissions) filteredSubs = filteredSubs.slice(0, 3);
+            else if (currentFilter !== 'all') filteredSubs = filteredSubs.filter(sub => sub.status === currentFilter);
+
+            if (filteredSubs.length === 0) {
+                const emptyMsg = currentFilter === 'approved' ? 'Пока нет одобренных заявок 🎯' : 'Пока нет отклоненных заявок ✅';
+                container.innerHTML = `<div class="animate-slide-up">${html}<div class="empty-state" style="padding: 20px 0;">${emptyMsg}</div></div>`;
+                return;
+            }
+
+            filteredSubs.forEach(sub => {
+                let statusHtml = '';
+                if (sub.status === 'pending') statusHtml = `<div class="status-badge status-pending"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M11.99 2C6.47 2 2 6.48 2 12s4.47 10 9.99 10C17.52 22 22 17.52 22 12S17.52 2 11.99 2zM12 20c-4.42 0-8-3.58-8-8s3.58-8 8-8 8 3.58 8 8-3.58 8-8 8zm.5-13H11v6l5.25 3.15.75-1.23-4.5-2.67z"/></svg> В обработке</div>`;
+                else if (sub.status === 'accepted') statusHtml = `<div class="status-badge status-accepted"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg> Принято (Редактируется)</div>`;
+                else if (sub.status === 'approved') statusHtml = `<div class="status-badge status-approved"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z"/></svg> Одобрено</div>`;
+                else if (sub.status === 'rejected') statusHtml = `<div class="status-badge status-rejected"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 2C6.47 2 2 6.47 2 12s4.47 10 10 10 10-4.47 10-10S17.53 2 12 2zm5 13.59L15.59 17 12 13.41 8.41 17 7 15.59 10.59 12 7 8.41 8.41 7 12 10.59 15.59 7 17 8.41 13.41 12 17 15.59z"/></svg> Отклонено</div><div class="reject-reason"><strong>Причина:</strong> ${escapeHtml(sub.rejectReason || 'Не указана')}</div>`;
+
+                const contactsHtml = (sub.contactName || sub.phone) ? `<div style="font-size:11px; color:var(--hint-color); margin-top:6px; display:flex; align-items:center; gap:6px; padding:6px 8px; background:rgba(255,255,255,0.03); border-radius:6px;"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M6.62 10.79c1.44 2.83 3.76 5.14 6.59 6.59l2.2-2.2c.27-.27.67-.36 1.02-.24 1.12.37 2.33.57 3.57.57.55 0 1 .45 1 1V20c0 .55-.45 1-1 1-9.39 0-17-7.61-17-17 0-.55.45-1 1-1h3.5c.55 0 1 .45 1 1 0 1.25.2 2.45.57 3.57.11.35.03.74-.25 1.02l-2.2 2.2z"/></svg><span>${escapeHtml(sub.contactName || '')}</span>${sub.phone ? `<span style="color:var(--text-color); font-weight:600;">${escapeHtml(sub.phone)}</span>` : ''}</div>` : '';
+
+                html += `<div class="card" style="margin-bottom:12px;"><div style="display:flex; justify-content:space-between; align-items:flex-start;"><div class="card-title" style="font-size:15px;">${escapeHtml(sub.title)}</div><div style="font-size:10px; color:var(--hint-color);">${escapeHtml(sub.timestamp)}</div></div><div class="offer-desc">${escapeHtml(sub.desc)}</div>${contactsHtml}${statusHtml}</div>`;
+            });
+
+            if (currentFilter === 'all' && mySubmissions.length > 3) {
+                html += `<button class="btn btn-secondary" style="margin-top:8px;" onclick="toggleSubmissionsView()">${showAllSubmissions ? 'Свернуть список' : `Показать все заявки (${mySubmissions.length})`}</button>`;
+            }
+            container.innerHTML = `<div class="animate-slide-up">${html}</div>`;
+        }
+
+        function renderPayoutSection(container) {
+            container.innerHTML = `
+                <div class="animate-slide-up">
+                    <button class="back-button" onclick="navigateProfileSection('menu')"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Назад к меню</button>
+                    <div class="section-title"><svg class="icon" style="color: #10b981;" viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg>Вывод средств</div>
+                    <div class="card">
+                        <div class="form-group"><label class="form-label">Номер карты / IBAN / USDT TRC20</label><input type="text" id="input-card" class="form-input" placeholder="Введите реквизиты" onchange="saveCardNumber()" value="${savedCard}"></div>
+                        <button class="btn" style="margin-top: 12px;" onclick="requestPayout()"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 14V6c0-1.1-.9-2-2-2H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zm-2 0H3V6h14v8zm-7-7c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3zm13 0v11c0 1.1-.9 2-2 2H4v-2h17V7h2z"/></svg>Запросить выплату</button>
+                    </div>
+                </div>
+            `;
+        }
+
+        function toggleSubmissionsView() { showAllSubmissions = !showAllSubmissions; tg?.HapticFeedback?.notificationOccurred('light'); renderProfile(); }
+        function setFilter(filterType) { currentFilter = filterType; showAllSubmissions = true; tg?.HapticFeedback?.notificationOccurred('light'); renderProfile(); }
+        
+        async function syncProfileData() {
+            tg?.HapticFeedback?.notificationOccurred('impact');
+            const container = document.getElementById('profile-content-container');
+            container.innerHTML = `<div class="empty-state">🔄 Синхронизация...</div>`;
+            profileSection = 'menu'; showAllSubmissions = false; currentFilter = 'all';
+            setTimeout(() => { renderProfile(); tg?.showAlert('Данные обновлены!'); }, 500);
+        }
+
+        async function submitNewPartner() {
+            const title = document.getElementById('partner-title').value.trim();
+            const desc = document.getElementById('partner-desc').value.trim();
+            const link = document.getElementById('partner-link').value.trim();
+            const contactName = document.getElementById('partner-contact-name').value.trim();
+            const phone = document.getElementById('partner-phone').value.trim();
+
+            if (!title || !desc) { tg?.showAlert('Заполни название и описание!'); return; }
+            if (!contactName || !phone) { tg?.showAlert('Укажи контактное лицо и номер телефона!'); return; }
+
+            const submissionId = `sub_${Date.now()}`;
+            const newSubmission = { id: submissionId, title, desc, link, contactName, phone, authorId: userId, authorName: userName, status: 'pending', rejectReason: '', timestamp: new Date().toLocaleString('ru-RU') };
+
+            mySubmissions.push(newSubmission);
+            localStorage.setItem(`cpa_submissions_${userId}`, JSON.stringify(mySubmissions));
+            pendingRequests.push(newSubmission);
+            localStorage.setItem('cpa_pending', JSON.stringify(pendingRequests));
+
+            try { await fetch(N8N_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ ...newSubmission, target: 'pending_partner' }) }); } 
+            catch (e) { console.error('Webhook error:', e); }
+
+            tg?.HapticFeedback?.notificationOccurred('success');
+            tg?.showAlert(`Заявка на "${title}" отправлена!`);
+            navigateProfileSection('menu');
+        }
+
+        function saveCardNumber() { savedCard = document.getElementById('input-card').value.trim(); localStorage.setItem(`cpa_card_${userId}`, savedCard); tg?.HapticFeedback?.notificationOccurred('success'); }
+        function requestPayout() { if (!savedCard) { tg?.showAlert('Сначала укажите реквизиты!'); return; } tg?.showAlert(`Запрос отправлен!\nРеквизиты: ${savedCard}`); }
+
+        // === БИРЖА И ПОРТФЕЛЬ ===
+        function renderMarket() {
+            const container = document.getElementById('market-offers-container');
+            container.innerHTML = '';
+            const activeOffers = catalog.filter(o => o.status === 'approved');
+            
+            // Инициализация карусели биржи
+            const topOffers = activeOffers.slice(0, 3).map(o => ({
+                title: o.title,
+                desc: o.desc,
+                badge: `${o.commission} ₴ / клиент`
+            }));
+            initHeroCarousel('track-market', 'dots-market', topOffers);
+
+            if (activeOffers.length === 0) { container.innerHTML = `<div class="empty-state">Пока нет доступных офферов.</div>`; return; }
+            
+            activeOffers.forEach(offer => {
+                const isAdded = myPortfolio.includes(offer.id);
+                const imageHtml = offer.image 
+                    ? `<img class="offer-image" src="${escapeHtml(offer.image)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><div class="offer-image-placeholder" style="display:none;"><svg class="icon-lg" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>`
+                    : `<div class="offer-image-placeholder"><svg class="icon-lg" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>`;
+                
+                const card = document.createElement('div');
+                card.className = 'offer-card animate-slide-up';
+                card.innerHTML = `
+                    ${imageHtml}
+                    <div class="offer-body">
+                        <div class="offer-header">
+                            <div class="offer-title">${escapeHtml(offer.title)}</div>
+                            <div class="offer-commission-badge">${offer.commission} ₴</div>
+                        </div>
+                        <div class="offer-desc">${escapeHtml(offer.desc)}</div>
+                        <div class="offer-footer">
+                            ${isAdded 
+                                ? `<button class="btn btn-secondary" disabled style="opacity:0.6;">✓ Добавлено в портфель</button>` 
+                                : `<button class="btn" onclick="addToPortfolio('${offer.id}')"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Добавить в работу</button>`}
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+            });
+        }
+
+        function addToPortfolio(offerId) {
+            if (!myPortfolio.includes(offerId)) {
+                myPortfolio.push(offerId);
+                localStorage.setItem(`cpa_portfolio_${userId}`, JSON.stringify(myPortfolio));
+                tg?.HapticFeedback?.notificationOccurred('success');
+                renderMarket();
+            }
+        }
+
+        function renderPortfolio() {
+            const container = document.getElementById('portfolio-offers-container');
+            container.innerHTML = '';
+            const activeOffers = catalog.filter(o => myPortfolio.includes(o.id));
+            
+            // 🔥 НОВЫЕ МОТИВАЦИОННЫЕ СЛОГАНЫ ДЛЯ АГЕНТА
+            const motivationalQuotes = [
+                {
+                    title: "Трафик = Деньги 💸",
+                    desc: "Каждая отправленная ссылка или QR-код — это реальный шаг к твоей финансовой цели. Не останавливайся!",
+                    badge: "Зарабатывай"
+                },
+                {
+                    title: "Дисциплина бьет класс 🚀",
+                    desc: "Топовые агенты не ждут идеального момента. Они действуют, тестируют гипотезы и масштабируют результат.",
+                    badge: "Рост"
+                },
+                {
+                    title: "Твой потенциал безграничен 🌟",
+                    desc: "Всего один успешно подключенный партнер может увеличить твой ежемесячный доход в разы. Продолжай искать!",
+                    badge: "Успех"
+                }
+            ];
+
+            // Инициализация карусели портфеля с мотивацией
+            initHeroCarousel('track-portfolio', 'dots-portfolio', motivationalQuotes);
+
+            if (activeOffers.length === 0) { 
+                container.innerHTML = `<div class="card"><div class="empty-state">Портфель пуст. Добавь офферы на «Бирже», чтобы начать зарабатывать!</div></div>`; 
+                return; 
+            }
+            
+            activeOffers.forEach(offer => {
+                const partnerUrl = offer.targetUrl || 'https://t.me/your_bot';
+                const directLink = `${partnerUrl}?start=agent_${userId}_offer_${offer.id}`;
+                const qrId = `qr-${offer.id}`;
+                const imageHtml = offer.image ? `<img class="offer-image" src="${escapeHtml(offer.image)}" style="height:120px;" onerror="this.style.display='none';">` : '';
+                
+                const card = document.createElement('div');
+                card.className = 'offer-card animate-slide-up';
+                card.innerHTML = `
+                    ${imageHtml}
+                    <div class="offer-body">
+                        <div class="offer-header">
+                            <div class="offer-title">${escapeHtml(offer.title)}</div>
+                            <div class="offer-commission-badge">${offer.commission} ₴</div>
+                        </div>
+                        <div class="offer-desc">Твоя уникальная ссылка:</div>
+                        <div class="link-box">${directLink}</div>
+                        <div class="offer-footer">
+                            <button class="btn btn-sm btn-secondary" onclick="copyLink('${directLink}')"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M16 1H4c-1.1 0-2 .9-2 2v14h2V3h12V1zm3 4H8c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h11c1.1 0 2-.9 2-2V7c0-1.1-.9-2-2-2zm0 16H8V7h11v14z"/></svg>Копировать</button>
+                        </div>
+                        <div style="text-align: center; margin-top: 12px;">
+                            <div class="offer-desc" style="margin-bottom: 8px;">QR-код:</div>
+                            <div class="qr-wrap" id="${qrId}"></div>
+                        </div>
+                    </div>
+                `;
+                container.appendChild(card);
+                setTimeout(() => {
+                    const elem = document.getElementById(qrId);
+                    if (elem && !elem.hasChildNodes()) new QRCode(elem, { text: directLink, width: 140, height: 140, colorDark: "#000000", colorLight: "#ffffff", correctLevel: QRCode.CorrectLevel.H });
+                }, 50);
+            });
+        }
+
+        // === АДМИН ПАНЕЛЬ ===
+        async function loadPendingRequestsFromN8n() {
+            const container = document.getElementById('admin-pending-container');
+            container.innerHTML = `<div class="empty-state">⏳ Загрузка...</div>`;
+            try {
+                const response = await fetch('https://tiktiok.xyz/webhook/admin-get-pending', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ target: 'get_pending' }) });
+                if (!response.ok) throw new Error(`HTTP ${response.status}`);
+                const data = await response.json();
+                pendingRequests = (Array.isArray(data) ? data : (data.items || [])).map(item => ({
+                    id: item.id || item.partner_id, title: item.title || item.name_and_geo, desc: item.desc || 'Без описания',
+                    link: item.link || item.custom_link || '', authorId: item.authorId || item.manager_id,
+                    authorName: item.authorName || item.author_name || 'Агент', timestamp: item.timestamp || item.created_at || ''
+                })).filter(item => item.id);
+                renderAdmin();
+            } catch (error) {
+                container.innerHTML = `<div class="empty-state" style="color:var(--danger-color);">Ошибка: ${error.message}<br><br><button class="btn btn-sm" onclick="loadPendingRequestsFromN8n()">🔄 Повторить</button></div>`;
+            }
+        }
+
+        function renderAdmin() {
+            const agentList = typeof mySubmissions !== 'undefined' ? mySubmissions : [];
+            const allAgents = new Set(pendingRequests.map(r => r.authorId).concat(agentList.map(s => s.authorId)));
+            document.getElementById('admin-total-partners').innerText = catalog.length;
+            document.getElementById('admin-total-agents').innerText = allAgents.size;
+            document.getElementById('admin-pending-count').innerText = pendingRequests.length;
+            document.getElementById('admin-editing-count').innerText = editingRequests.length;
+
+            const pendingContainer = document.getElementById('admin-pending-container');
+            pendingContainer.innerHTML = '';
+            if (pendingRequests.length === 0) {
+                pendingContainer.innerHTML = `<div class="empty-state">Нет новых заявок<button class="btn btn-sm" style="margin-top:10px" onclick="loadPendingRequestsFromN8n()">🔄 Обновить</button></div>`;
+            } else {
+                pendingRequests.forEach(req => {
+                    const div = document.createElement('div');
+                    div.className = 'pending-item animate-slide-up';
+                    div.innerHTML = `
+                        <div class="pending-item-header"><div class="card-title" style="font-size:15px;">${escapeHtml(req.title)}</div><div class="pending-author">ID: ${escapeHtml(String(req.authorId))}</div></div>
+                        <div class="offer-desc" style="margin-bottom:8px;">${escapeHtml(req.desc)}</div>
+                        ${req.contactName || req.phone ? `<div style="font-size:11px; color:var(--hint-color); margin-bottom:6px;">📞 ${escapeHtml(req.contactName || '')} ${escapeHtml(req.phone || '')}</div>` : ''}
+                        <div style="font-size:11px; color:var(--hint-color); margin-bottom:8px;">Автор: ${escapeHtml(req.authorName)} | ${escapeHtml(req.timestamp)}</div>
+                        <div class="pending-actions">
+                            <button class="btn btn-info btn-sm" onclick="acceptPartner('${req.id}')"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Принять</button>
+                            <button class="btn btn-danger btn-sm" onclick="rejectPartner('${req.id}')"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/></svg>Отклонить</button>
+                        </div>`;
+                    pendingContainer.appendChild(div);
+                });
+            }
+
+            const editContainer = document.getElementById('admin-editing-container');
+            editContainer.innerHTML = '';
+            if (editingRequests.length === 0) {
+                editContainer.innerHTML = `<div class="empty-state">Нет офферов на редактировании</div>`;
+            } else {
+                editingRequests.forEach(req => {
+                    const div = document.createElement('div');
+                    div.className = 'edit-item animate-slide-up';
+                    div.innerHTML = `
+                        <div class="pending-item-header"><div class="card-title" style="font-size:15px; color:var(--info-color);">Редактирование: ${escapeHtml(req.title)}</div></div>
+                        <div class="edit-form">
+                            <div class="form-group">
+                                <label class="form-label"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg>Фотография оффера</label>
+                                <div class="file-upload-wrap">
+                                    <label class="file-upload-btn" for="edit-image-${req.id}"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M9 16h6v-6h4l-7-7-7 7h4v6zm-4 2h14v2H5v-2z"/></svg>${req.image ? '📷 Изменить фото' : '📷 Загрузить фото'}</label>
+                                    <input type="file" id="edit-image-${req.id}" accept="image/*" onchange="previewEditImage('${req.id}', this)">
+                                    ${req.image ? `<img id="preview-${req.id}" class="image-preview" src="${req.image}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><div class="image-preview-placeholder" style="display:none;">Ошибка загрузки</div>` : `<img id="preview-${req.id}" class="image-preview" style="display:none;"><div id="placeholder-${req.id}" class="image-preview-placeholder">Фото не выбрано</div>`}
+                                </div>
+                            </div>
+                            <div class="form-group"><label class="form-label">Название оффера</label><input type="text" id="edit-title-${req.id}" class="form-input" value="${escapeHtml(req.title)}"></div>
+                            <div class="form-group"><label class="form-label">Описание</label><textarea id="edit-desc-${req.id}" class="form-input">${escapeHtml(req.desc)}</textarea></div>
+                            <div class="form-group"><label class="form-label">Комиссия (грн/%)</label><input type="number" id="edit-commission-${req.id}" class="form-input" value="${req.commission || ''}" placeholder="Например: 70"></div>
+                            <div class="form-group"><label class="form-label">Целевая ссылка (URL проекта)</label><input type="text" id="edit-link-${req.id}" class="form-input" value="${escapeHtml(req.link || '')}" placeholder="https://..."></div>
+                        </div>
+                        <div class="pending-actions" style="margin-top:12px;">
+                            <button class="btn btn-success btn-sm" onclick="publishOffer('${req.id}')"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>Опубликовать на биржу</button>
+                        </div>
+                    `;
+                    editContainer.appendChild(div);
+                });
+            }
+        }
+
+        function acceptPartner(submissionId) {
+            const reqIndex = pendingRequests.findIndex(r => r.id === submissionId);
+            if (reqIndex === -1) return;
+            const req = pendingRequests[reqIndex];
+            updateSubmissionStatus(req.authorId, submissionId, 'accepted', '');
+            editingRequests.push({...req, status: 'accepted'});
+            localStorage.setItem('cpa_editing', JSON.stringify(editingRequests));
+            pendingRequests.splice(reqIndex, 1);
+            localStorage.setItem('cpa_pending', JSON.stringify(pendingRequests));
+            sendN8nWebhook({ target: 'partner_edit', submissionId: req.id, authorId: req.authorId });
+            tg?.HapticFeedback?.notificationOccurred('success');
+            renderAdmin();
+        }
+
+        function previewEditImage(reqId, input) {
+            const file = input.files[0];
+            if (!file) return;
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const preview = document.getElementById(`preview-${reqId}`);
+                const placeholder = document.getElementById(`placeholder-${reqId}`);
+                preview.src = e.target.result;
+                preview.style.display = 'block';
+                if (placeholder) placeholder.style.display = 'none';
+                tg?.HapticFeedback?.notificationOccurred('light');
+            };
+            reader.readAsDataURL(file);
+        }
+
+        function publishOffer(submissionId) {
+            const editIndex = editingRequests.findIndex(r => r.id === submissionId);
+            if (editIndex === -1) return;
+            const req = editingRequests[editIndex];
+
+            const title = document.getElementById(`edit-title-${submissionId}`).value.trim();
+            const desc = document.getElementById(`edit-desc-${submissionId}`).value.trim();
+            const link = document.getElementById(`edit-link-${submissionId}`).value.trim();
+            const commission = document.getElementById(`edit-commission-${submissionId}`).value.trim();
+            
+            const imageInput = document.getElementById(`edit-image-${submissionId}`);
+            const previewImg = document.getElementById(`preview-${submissionId}`);
+            let image = req.image || '';
+            if (imageInput.files && imageInput.files[0]) {
+                image = previewImg ? previewImg.src : '';
+            }
+
+            if (!title || !desc || !commission) {
+                tg?.showAlert('Заполните название, описание и комиссию!');
+                return;
+            }
+
+            catalog.push({ id: `off_${Date.now()}`, title, desc, image, targetUrl: link, commission: Number(commission), status: 'approved', addedBy: req.authorId });
+            localStorage.setItem('cpa_catalog', JSON.stringify(catalog));
+            updateSubmissionStatus(req.authorId, submissionId, 'approved', '');
+            editingRequests.splice(editIndex, 1);
+            localStorage.setItem('cpa_editing', JSON.stringify(editingRequests));
+            sendN8nWebhook({ target: 'partner_approved', submissionId, authorId: req.authorId });
+            tg?.HapticFeedback?.notificationOccurred('success');
+            tg?.showAlert('Оффер успешно опубликован на бирже!');
+            renderAdmin();
+        }
+
+        function rejectPartner(submissionId) {
+            const reqIndex = pendingRequests.findIndex(r => r.id === submissionId);
+            if (reqIndex === -1) return;
+            const req = pendingRequests[reqIndex];
+            const reason = prompt('Причина отклонения:', 'Недостаточно информации');
+            if (reason === null) return;
+            updateSubmissionStatus(req.authorId, submissionId, 'rejected', reason);
+            pendingRequests.splice(reqIndex, 1);
+            localStorage.setItem('cpa_pending', JSON.stringify(pendingRequests));
+            sendN8nWebhook({ target: 'partner_rejected', submissionId, authorId: req.authorId, reason });
+            tg?.HapticFeedback?.notificationOccurred('error');
+            renderAdmin();
+        }
+
+        function updateSubmissionStatus(authorId, submissionId, status, reason) {
+            let agentSubs = JSON.parse(localStorage.getItem(`cpa_submissions_${authorId}`)) || [];
+            const subIndex = agentSubs.findIndex(s => s.id === submissionId);
+            if (subIndex !== -1) {
+                agentSubs[subIndex].status = status;
+                agentSubs[subIndex].rejectReason = reason;
+                localStorage.setItem(`cpa_submissions_${authorId}`, JSON.stringify(agentSubs));
+            }
+        }
+
+        function sendN8nWebhook(payload) {
+            fetch(N8N_WEBHOOK_URL, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(payload) }).catch(e => console.warn('Webhook failed:', e));
+        }
+
+        function copyLink(text) {
+            navigator.clipboard.writeText(text).then(() => tg?.showAlert('Скопировано!')).catch(() => {
+                const input = document.createElement('input'); input.value = text; document.body.appendChild(input); input.select();
+                document.execCommand('copy'); document.body.removeChild(input); tg?.showAlert('Скопировано!');
+            });
+        }
+
+        // Запуск при старте
+        renderMarket();
+    </script>
+</body>
+</html>
