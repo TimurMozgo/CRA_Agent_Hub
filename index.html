@@ -177,6 +177,96 @@
         .carousel-dots { display: flex; justify-content: center; gap: 6px; margin-top: 12px; }
         .carousel-dot { width: 6px; height: 6px; border-radius: 50%; background: rgba(255,255,255,0.3); transition: all 0.3s; }
         .carousel-dot.active { background: #ffffff; width: 18px; border-radius: 3px; }
+
+        /* 🔥 Дашборд менеджера */
+        .manager-dashboard {
+            background: linear-gradient(145deg, #0f172a, #1e1b4b);
+            border-radius: 16px;
+            padding: 16px;
+            border: 1px solid rgba(139, 92, 246, 0.2);
+            margin-bottom: 12px;
+        }
+        .dashboard-header {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            margin-bottom: 14px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid rgba(255,255,255,0.1);
+        }
+        .dashboard-title {
+            font-size: 14px;
+            font-weight: 700;
+            color: #f1f5f9;
+        }
+        .dashboard-badge {
+            background: linear-gradient(135deg, #10b981, #059669);
+            color: white;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 3px 8px;
+            border-radius: 6px;
+            margin-left: auto;
+        }
+        .dashboard-stats {
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .stat-card {
+            background: rgba(255,255,255,0.05);
+            border-radius: 10px;
+            padding: 12px;
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+        .stat-label {
+            font-size: 10px;
+            color: #94a3b8;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+            margin-bottom: 4px;
+        }
+        .stat-value {
+            font-size: 18px;
+            font-weight: 800;
+            color: #f1f5f9;
+        }
+        .stat-value.green { color: #34d399; }
+        .stat-value.orange { color: #fbbf24; }
+        .stat-value.blue { color: #60a5fa; }
+
+        .agents-list-title {
+            font-size: 12px;
+            color: #94a3b8;
+            margin-bottom: 8px;
+            font-weight: 600;
+        }
+        .agent-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 10px 12px;
+            background: rgba(255,255,255,0.03);
+            border-radius: 8px;
+            margin-bottom: 6px;
+            border: 1px solid rgba(255,255,255,0.05);
+        }
+        .agent-row-name {
+            font-size: 13px;
+            font-weight: 600;
+            color: #f1f5f9;
+        }
+        .agent-row-id {
+            font-size: 10px;
+            color: #94a3b8;
+            font-family: monospace;
+        }
+        .agent-row-earn {
+            font-size: 13px;
+            font-weight: 700;
+            color: #34d399;
+        }
     </style>
 </head>
 <body>
@@ -319,6 +409,27 @@
         const tg = window.Telegram?.WebApp;
         if (tg) { tg.ready(); tg.expand(); tg.setHeaderColor('#0b0f19'); tg.setBackgroundColor('#0b0f19'); }
 
+        // 🔥 БЕЗОПАСНЫЕ ЗАГЛУШКИ для тестирования в браузере
+        if (!tg || !tg.showAlert) {
+            window.tg = {
+                ready: () => {},
+                expand: () => {},
+                setHeaderColor: () => {},
+                setBackgroundColor: () => {},
+                showAlert: (msg) => alert(msg),
+                showPopup: (params) => alert(params.message || params),
+                HapticFeedback: {
+                    notificationOccurred: () => {},
+                    impactOccurred: () => {},
+                    selectionChanged: () => {}
+                },
+                initDataUnsafe: { user: { id: 6750749768, first_name: 'ТестовыйАгент' } }
+            };
+        }
+
+        // 🔥 Глобальный ID менеджера (был забыт в коде)
+        const TARGET_MANAGER_ID = '6088315974';
+
         const userId = tg?.initDataUnsafe?.user?.id || 6750749768;
         const userName = tg?.initDataUnsafe?.user?.first_name || 'Агент';
         const userPhoto = tg?.initDataUnsafe?.user?.photo_url || `https://ui-avatars.com/api/?name=${encodeURIComponent(userName)}&background=8b5cf6&color=fff&size=128`;
@@ -418,6 +529,7 @@
             mySubmissions = JSON.parse(localStorage.getItem(`cpa_submissions_${userId}`)) || [];
             const hasApprovedPartner = mySubmissions.some(sub => sub.status === 'approved');
             const roleBadge = document.getElementById('profile-role');
+            
             if (hasApprovedPartner) {
                 roleBadge.innerHTML = `<svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M12 1L3 5v6c0 5.55 3.84 10.74 9 12 5.16-1.26 9-6.45 9-12V5l-9-4z"/></svg> Менеджер`;
                 roleBadge.className = 'profile-role-badge manager';
@@ -429,25 +541,216 @@
             const container = document.getElementById('profile-content-container');
             container.innerHTML = '';
             
-            // Инициализация карусели профиля при каждом рендере
-            const profileTips = [
-                { title: 'Добавляй партнеров', desc: 'Каждый одобренный партнер повышает твой статус и доход.', badge: 'Цель: Менеджер' },
-                { title: 'Проверяй портфель', desc: 'Используй уникальные ссылки и QR-коды для привлечения трафика.', badge: 'Совет дня' },
-                { title: 'Своевременный вывод', desc: 'Указывай актуальные реквизиты для быстрых выплат.', badge: 'Финансы' }
-            ];
-            initHeroCarousel('track-profile', 'dots-profile', profileTips);
-
             if (profileSection === 'menu') renderProfileMenu(container);
             else if (profileSection === 'add_partner') renderAddPartnerSection(container);
             else if (profileSection === 'submissions') renderSubmissionsSection(container);
             else if (profileSection === 'payout') renderPayoutSection(container);
         }
 
+        // 🔥 Дашборд обычного агента (простой и мотивирующий)
+        function renderAgentStats(container) {
+            const myApprovedOffers = catalog.filter(o => o.addedBy === userId && o.status === 'approved');
+            const pendingOffers = mySubmissions.filter(s => s.status === 'pending' || s.status === 'accepted');
+            
+            // 🔥 Считаем реальный заработок агента (50% от общей комиссии)
+            let totalAgentEarned = 0;
+            let totalClientCashback = 0;
+            
+            myApprovedOffers.forEach(o => {
+                const commission = o.totalCommission || 0;
+                totalAgentEarned += commission * ((o.splitAgent || 50) / 100);
+                totalClientCashback += commission * ((o.splitClient || 25) / 100);
+            });
+
+            const html = `
+                <div class="animate-slide-up">
+                    <button class="back-button" onclick="navigateProfileSection('menu')">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M20 11H7.83l5.59-5.59L12 4l-8 8 8 8 1.41-1.41L7.83 13H20v-2z"/></svg> Назад к меню
+                    </button>
+                    
+                    <div class="section-title">
+                        <svg class="icon" style="color: #10b981;" viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg>
+                        Мои доходы
+                    </div>
+
+                    <div class="manager-dashboard">
+                        <div class="dashboard-header">
+                            <div class="dashboard-title">Финансовая сводка</div>
+                            <div class="dashboard-badge" style="background: linear-gradient(135deg, #8b5cf6, #6d28d9);">Агент</div>
+                        </div>
+                        
+                        <div class="dashboard-stats">
+                            <div class="stat-card">
+                                <div class="stat-label">Твой заработок (50%)</div>
+                                <div class="stat-value green">${totalAgentEarned.toFixed(2)} ₴</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Кэшбек твоим клиентам (25%)</div>
+                                <div class="stat-value blue">${totalClientCashback.toFixed(2)} ₴</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Заявок в обработке</div>
+                                <div class="stat-value orange">${pendingOffers.length}</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-label">Одобренных партнёров</div>
+                                <div class="stat-value">${myApprovedOffers.length}</div>
+                            </div>
+                        </div>
+
+                        <button class="btn" onclick="navigateProfileSection('payout')" style="background: linear-gradient(135deg, #10b981, #059669);">
+                            <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 14V6c0-1.1-.9-2-2-2H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zm-2 0H3V6h14v8zm-7-7c-1.66 0-3 1.34-3 3s1.34 3 3 3 3-1.34 3-3-1.34-3-3-3zm13 0v11c0 1.1-.9 2-2 2H4v-2h17V7h2z"/></svg>
+                            Запросить выплату (${totalAgentEarned.toFixed(2)} ₴)
+                        </button>
+                    </div>
+                </div>
+            `;
+            container.innerHTML = html;
+        }
+
+            // 🔥 УМНАЯ ФУНКЦИЯ: открывает правильный дашборд в зависимости от роли
+        function openIncomeDashboard() {
+            const isManager = mySubmissions.some(sub => sub.status === 'approved');
+            const container = document.getElementById('profile-content-container');
+            
+            if (isManager) {
+                // Если менеджер → показываем менеджерский дашборд
+                container.innerHTML = ''; // Очищаем контейнер
+                renderManagerDashboard(container);
+            } else {
+                // Если агент → показываем агентский дашборд
+                navigateProfileSection('agent_stats');
+            }
+        }
+
+        // ==========================================
+        // 1. КОНФИГУРАЦИЯ И ЗАГРУЗКА ДАННЫХ
+        // ==========================================
+        const SPREADSHEET_ID = '1WXMx-RYbgbEWO02LRgQvCJfxBA4dzHPsJeeKOpHodE0';
+
+        async function initDashboard() {
+            // Укажи ID своего главного контейнера на странице
+            const container = document.getElementById('dashboard-container') || document.body;
+
+            try {
+                // Читаем лист Managers (запечённый результат работы n8n в 20:00)
+                const response = await fetch(`https://docs.google.com/spreadsheets/d/${SPREADSHEET_ID}/gviz/tq?tqx=out:json&sheet=Managers`);
+                const rawText = await response.text();
+                
+                // Очищаем Google JSON от обертки google.visualization.Query.setResponse(...)
+                const json = JSON.parse(rawText.substring(47, rawText.length - 2));
+                const rows = json.table.rows;
+
+                // Ищем менеджера manager_default или берем первую строчку с цифрами
+                const row = rows.find(r => String(r.c[0]?.v) === 'manager_default') || rows[0];
+
+                if (row) {
+                    // Раскладываем данные по твоим колонкам со скриншота:
+                    // A (0): manager_id | C (2): total_earned | D (3): manager_balance
+                    // E (4): status     | F (5): agents_payout_due | G (6): system_due
+                    const managerData = {
+                        manager_id: row.c[0]?.v || 'manager_default',
+                        status: row.c[4]?.v === 'active' ? 'Активен' : (row.c[4]?.v || 'Активен'),
+                        total_revenue: Number(row.c[2]?.v) || 0,        // Общая касса
+                        manager_balance: Number(row.c[3]?.v) || 0,      // Твой доход (1.5%)
+                        agents_payout_due: Number(row.c[5]?.v) || 0,    // Агентам к выплате (97%)
+                        system_due: Number(row.c[6]?.v) || 0           // Владельцу / системе (1.5%)
+                    };
+
+                    // Список агентов из таблицы (или fallback)
+                    const agentsList = [
+                        { agent_id: '6750749768', name: 'Агент #1', current_balance: managerData.agents_payout_due }
+                    ];
+
+                    // Запускаем ТВОЮ функцию рендера с готовыми данными
+                    renderManagerDashboard(container, managerData, agentsList);
+                }
+            } catch (e) {
+                console.error("Ошибка при чтении Google Таблицы:", e);
+            }
+        }
+
+        // ==========================================
+        // 2. ТВОЯ ФУНКЦИЯ РЕНДЕРА (БЕЗ ИЗМЕНЕНИЙ)
+        // ==========================================
+        function renderManagerDashboard(container, managerData = {}, agentsList = []) {
+            const totalRevenue = managerData.total_revenue || 0;
+            const managerCut = managerData.manager_balance || 0;
+            const agentsCut = managerData.agents_payout_due || 0;
+            const ownerCut = managerData.system_due || 0;
+
+            const agents = agentsList.length > 0 ? agentsList : [
+                { name: 'Нет активных агентов', id: '-', earned: 0 }
+            ];
+
+            const html = `
+                <div class="manager-dashboard animate-slide-up">
+                    <div class="dashboard-header">
+                        <svg class="icon icon-sm" style="color: #34d399;" viewBox="0 0 24 24">
+                            <path d="M3.5 18.49l6-6.01 4 4L22 6.92l-1.41-1.41-7.09 7.97-4-4L2 16.99z"/>
+                        </svg>
+                        <div class="dashboard-title">Дашборд менеджера</div>
+                        <div class="dashboard-badge">${managerData.status || 'Активен'}</div>
+                    </div>
+                    
+                    <div class="dashboard-stats">
+                        <div class="stat-card">
+                            <div class="stat-label">Общая касса</div>
+                            <div class="stat-value">${Number(totalRevenue).toLocaleString('ru-RU', { minimumFractionDigits: 2 })} ₴</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Твой доход (1.5%)</div>
+                            <div class="stat-value green">${Number(managerCut).toFixed(2)} ₴</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Агентам к выплате (97%)</div>
+                            <div class="stat-value orange">${Number(agentsCut).toFixed(2)} ₴</div>
+                        </div>
+                        <div class="stat-card">
+                            <div class="stat-label">Владельцу (1.5%)</div>
+                            <div class="stat-value blue">${Number(ownerCut).toFixed(2)} ₴</div>
+                        </div>
+                    </div>
+
+                    <div class="agents-list-title">👥 Агенты в команде</div>
+                    ${agents.map(a => `
+                        <div class="agent-row">
+                            <div>
+                                <div class="agent-row-name">${a.name || a.agent_id}</div>
+                                <div class="agent-row-id">ID: ${a.agent_id || a.id}</div>
+                            </div>
+                            <div class="agent-row-earn">${Number(a.current_balance || a.earned || 0).toFixed(2)} ₴</div>
+                        </div>
+                    `).join('')}
+
+                    <button class="btn btn-success" style="margin-top: 12px;" onclick="triggerPayouts()">
+                        <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 14V6c0-1.1-.9-2-2-2H3c-1.1 0-2 .9-2 2v8c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zm-2 0H3V6h14v8z"/></svg>
+                        Выплатить агентам
+                    </button>
+                </div>
+            `;
+            
+            container.innerHTML = html;
+        }
+
+        // ==========================================
+        // 3. ЗАПУСК ПРИ ОТКРЫТИИ ПРИЛОЖЕНИЯ
+        // ==========================================
+        document.addEventListener('DOMContentLoaded', initDashboard);
+
         function renderProfileMenu(container) {
             const pendingCount = mySubmissions.filter(s => s.status === 'pending' || s.status === 'accepted').length;
+            const isManager = mySubmissions.some(sub => sub.status === 'approved');
+            
             container.innerHTML = `
                 <div class="animate-slide-up">
                     <div class="profile-menu-grid">
+                        <!-- 🔥 Кнопка "Мои доходы" теперь умная -->
+                        <div class="menu-card" onclick="openIncomeDashboard()" style="--accent-color: #10b981; --accent-bg: rgba(16, 185, 129, 0.15);">
+                            <div class="menu-card-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M16 6l2.29 2.29-4.88 4.88-4-4L2 16.59 3.41 18l6-6 4 4 6.3-6.29L22 12V6z"/></svg></div>
+                            <div class="menu-card-body"><div class="menu-card-title">Мои доходы</div><div class="menu-card-desc">Статистика и заработок</div></div>
+                        </div>
+
                         <div class="menu-card" onclick="navigateProfileSection('add_partner')" style="--accent-color: #8b5cf6; --accent-bg: rgba(139, 92, 246, 0.15);">
                             <div class="menu-card-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm5 11h-4v4h-2v-4H7v-2h4V7h2v4h4v2z"/></svg></div>
                             <div class="menu-card-body"><div class="menu-card-title">Предложить партнёра</div><div class="menu-card-desc">Добавить новый бизнес в систему</div></div>
@@ -457,7 +760,7 @@
                             <div class="menu-card-body"><div class="menu-card-title">Мои заявки</div><div class="menu-card-desc">Статусы и история модерации</div></div>
                             ${pendingCount > 0 ? `<div class="menu-card-badge">${pendingCount}</div>` : ''}
                         </div>
-                        <div class="menu-card" onclick="navigateProfileSection('payout')" style="--accent-color: #10b981; --accent-bg: rgba(16, 185, 129, 0.15);">
+                        <div class="menu-card" onclick="navigateProfileSection('payout')" style="--accent-color: #f59e0b; --accent-bg: rgba(245, 158, 11, 0.15);">
                             <div class="menu-card-icon"><svg class="icon" viewBox="0 0 24 24"><path d="M21 18v1c0 1.1-.9 2-2 2H5c-1.11 0-2-.9-2-2V5c0-1.1.89-2 2-2h14c1.1 0 2 .9 2 2v1h-9c-1.11 0-2 .9-2 2v8c0 1.1.89 2 2 2h9zm-9-2h10V8H12v8zm4-2.5c-.83 0-1.5-.67-1.5-1.5s.67-1.5 1.5-1.5 1.5.67 1.5 1.5-.67 1.5-1.5 1.5z"/></svg></div>
                             <div class="menu-card-body"><div class="menu-card-title">Вывод средств</div><div class="menu-card-desc">Реквизиты и запрос выплаты</div></div>
                         </div>
@@ -590,36 +893,58 @@
             container.innerHTML = '';
             const activeOffers = catalog.filter(o => o.status === 'approved');
             
-            // Инициализация карусели биржи
-            const topOffers = activeOffers.slice(0, 3).map(o => ({
-                title: o.title,
-                desc: o.desc,
-                badge: `${o.commission} ₴ / клиент`
-            }));
+            // 🔥 Инициализация карусели биржи
+            const topOffers = activeOffers.slice(0, 3).map(o => {
+                const total = o.totalCommission || o.commission || 0;
+                return {
+                    title: o.title,
+                    desc: o.desc,
+                    badge: `${total} % от общей суммы`
+                };
+            });
             initHeroCarousel('track-market', 'dots-market', topOffers);
 
-            if (activeOffers.length === 0) { container.innerHTML = `<div class="empty-state">Пока нет доступных офферов.</div>`; return; }
+            if (activeOffers.length === 0) { 
+                container.innerHTML = `<div class="empty-state">Пока нет доступных офферов.</div>`; 
+                return; 
+            }
             
             activeOffers.forEach(offer => {
                 const isAdded = myPortfolio.includes(offer.id);
+                const totalComm = offer.totalCommission || offer.commission || 0;
+
                 const imageHtml = offer.image 
                     ? `<img class="offer-image" src="${escapeHtml(offer.image)}" onerror="this.style.display='none'; this.nextElementSibling.style.display='flex';"><div class="offer-image-placeholder" style="display:none;"><svg class="icon-lg" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>`
                     : `<div class="offer-image-placeholder"><svg class="icon-lg" viewBox="0 0 24 24"><path d="M21 19V5c0-1.1-.9-2-2-2H5c-1.1 0-2 .9-2 2v14c0 1.1.9 2 2 2h14c1.1 0 2-.9 2-2zM8.5 13.5l2.5 3.01L14.5 12l4.5 6H5l3.5-4.5z"/></svg></div>`;
                 
                 const card = document.createElement('div');
                 card.className = 'offer-card animate-slide-up';
+                
+                // 🔥 КРАСИВАЯ КАРТОЧКА БЕЗ РАСПРЕДЕЛЕНИЯ
                 card.innerHTML = `
                     ${imageHtml}
                     <div class="offer-body">
-                        <div class="offer-header">
-                            <div class="offer-title">${escapeHtml(offer.title)}</div>
-                            <div class="offer-commission-badge">${offer.commission} ₴</div>
+                        <div style="display:flex; justify-content:space-between; align-items:flex-start; margin-bottom:8px;">
+                            <div class="offer-title" style="font-size:17px; font-weight:700; color:#f1f5f9; line-height:1.3;">${escapeHtml(offer.title)}</div>
+                            <div class="offer-commission-badge" style="background:linear-gradient(135deg, #10b981, #059669); color:white; padding:6px 12px; border-radius:10px; font-size:14px; font-weight:800; white-space:nowrap; box-shadow:0 2px 8px rgba(16,185,129,0.3);">
+                                ${totalComm} %
+                            </div>
                         </div>
-                        <div class="offer-desc">${escapeHtml(offer.desc)}</div>
+                        
+                        <div class="offer-desc" style="font-size:13px; color:#94a3b8; line-height:1.5; margin-bottom:16px;">
+                            ${escapeHtml(offer.desc) || 'Без описания'}
+                        </div>
+
                         <div class="offer-footer">
                             ${isAdded 
-                                ? `<button class="btn btn-secondary" disabled style="opacity:0.6;">✓ Добавлено в портфель</button>` 
-                                : `<button class="btn" onclick="addToPortfolio('${offer.id}')"><svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>Добавить в работу</button>`}
+                                ? `<button class="btn btn-secondary" disabled style="opacity:0.6; background:rgba(16,185,129,0.1); border-color:rgba(16,185,129,0.3); color:#10b981;">
+                                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M9 16.17L4.83 12l-1.42 1.41L9 19 21 7l-1.41-1.41z"/></svg>
+                                    Добавлено в портфель
+                                </button>` 
+                                : `<button class="btn" onclick="addToPortfolio('${offer.id}')" style="background:linear-gradient(135deg, #8b5cf6, #7c3aed);">
+                                    <svg class="icon icon-sm" viewBox="0 0 24 24"><path d="M19 13h-6v6h-2v-6H5v-2h6V5h2v6h6v2z"/></svg>
+                                    Добавить в работу
+                                </button>`}
                         </div>
                     </div>
                 `;
@@ -645,17 +970,17 @@
             const motivationalQuotes = [
                 {
                     title: "Трафик = Деньги 💸",
-                    desc: "Каждая отправленная ссылка или QR-код — это реальный шаг к твоей финансовой цели. Не останавливайся!",
+                    desc: "Каждая отправленная ссылка или QR-код — это реальный шаг к твоей финансовой цели.",
                     badge: "Зарабатывай"
                 },
                 {
                     title: "Дисциплина бьет класс 🚀",
-                    desc: "Топовые агенты не ждут идеального момента. Они действуют, тестируют гипотезы и масштабируют результат.",
+                    desc: "Топовые агенты не ждут идеального момента. Они действуют и масштабируют результат.",
                     badge: "Рост"
                 },
                 {
                     title: "Твой потенциал безграничен 🌟",
-                    desc: "Всего один успешно подключенный партнер может увеличить твой ежемесячный доход в разы. Продолжай искать!",
+                    desc: "Один успешно подключенный партнер может увеличить твой ежемесячный доход в разы!",
                     badge: "Успех"
                 }
             ];
@@ -820,7 +1145,7 @@
             const title = document.getElementById(`edit-title-${submissionId}`).value.trim();
             const desc = document.getElementById(`edit-desc-${submissionId}`).value.trim();
             const link = document.getElementById(`edit-link-${submissionId}`).value.trim();
-            const commission = document.getElementById(`edit-commission-${submissionId}`).value.trim();
+            const totalCommission = Number(document.getElementById(`edit-commission-${submissionId}`).value.trim());
             
             const imageInput = document.getElementById(`edit-image-${submissionId}`);
             const previewImg = document.getElementById(`preview-${submissionId}`);
@@ -829,17 +1154,55 @@
                 image = previewImg ? previewImg.src : '';
             }
 
-            if (!title || !desc || !commission) {
+            if (!title || !desc || !totalCommission) {
                 tg?.showAlert('Заполните название, описание и комиссию!');
                 return;
             }
 
-            catalog.push({ id: `off_${Date.now()}`, title, desc, image, targetUrl: link, commission: Number(commission), status: 'approved', addedBy: req.authorId });
+            // Создаём полный объект оффера
+            const offerData = {
+                id: `off_${Date.now()}`,
+                title,
+                desc,
+                image,
+                targetUrl: link,
+                totalCommission,
+                splitAgent: 50,
+                splitClient: 25,
+                splitManager: 15,
+                splitSystem: 10,
+                status: 'approved',
+                addedBy: req.authorId,
+                managerId: TARGET_MANAGER_ID,
+                createdAt: new Date().toLocaleString('ru-RU')
+            };
+
+            // Добавляем в локальный каталог
+            catalog.push(offerData);
             localStorage.setItem('cpa_catalog', JSON.stringify(catalog));
+            
+            // Обновляем статус заявки
             updateSubmissionStatus(req.authorId, submissionId, 'approved', '');
             editingRequests.splice(editIndex, 1);
             localStorage.setItem('cpa_editing', JSON.stringify(editingRequests));
-            sendN8nWebhook({ target: 'partner_approved', submissionId, authorId: req.authorId });
+            
+            // 🔥 ОТПРАВЛЯЕМ ПОЛНЫЕ ДАННЫЕ В N8N (включая контакты)
+            sendN8nWebhook({
+                target: 'partner_approved',
+                partner_id: offerData.id,
+                manager_id: TARGET_MANAGER_ID,
+                name_and_geo: title,
+                description: desc,
+                image_url: image,
+                custom_link: link,
+                tariff_rate: totalCommission,
+                status: 'active',
+                authorId: req.authorId,
+                submissionId: submissionId,
+                contactName: req.contactName || '',  //  Имя контактного лица
+                phone: req.phone || ''                // 🔥 Номер телефона
+            });
+            
             tg?.HapticFeedback?.notificationOccurred('success');
             tg?.showAlert('Оффер успешно опубликован на бирже!');
             renderAdmin();
